@@ -32,10 +32,6 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
   const botAvatar = PlaceHolderImages.find(p => p.id === 'bot-avatar');
 
   useEffect(() => {
-    setTasks(initialTasks);
-  }, [initialTasks]);
-
-  useEffect(() => {
     const getInitialMessage = async () => {
         setIsSending(true);
         try {
@@ -55,7 +51,7 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
     }
     getInitialMessage();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTasks, overdueTasks, dueSoonTasks]);
+  }, []);
 
   const addBotMessage = (text: string, delay = 500) => {
     setTimeout(() => {
