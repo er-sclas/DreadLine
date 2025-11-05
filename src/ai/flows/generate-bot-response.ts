@@ -26,7 +26,7 @@ const GenerateBotResponseInputSchema = z.object({
   history: z.array(MessageSchema).describe('The conversation history.'),
   newUserMessage: z.string().optional().describe('The new message from the user.'),
 });
-type GenerateBotResponseInput = z.infer<typeof GenerateBotResponseInputSchema>;
+export type GenerateBotResponseInput = z.infer<typeof GenerateBotResponseInputSchema>;
 
 const GenerateBotResponseOutputSchema = z.object({
   response: z.string().describe('The bot\'s response.'),
@@ -39,18 +39,23 @@ export async function generateBotResponse(input: GenerateBotResponseInput): Prom
   return generateBotResponseFlow(input);
 }
 
-
 const prompt = ai.definePrompt({
   name: 'generateBotResponsePrompt',
-  input: { schema: GenerateBotResponseInputSchema },
+  input: { schema: z.object({
+    overdueTasks: z.string(),
+    dueSoonTasks: z.string(),
+    allTasksCount: z.number(),
+    history: z.string(),
+    newUserMessage: z.string().optional(),
+  })},
   output: { schema: GenerateBotResponseOutputSchema },
   prompt: `You are Dreadline, a delightfully dreadful, snarky, and obnoxious to-do list assistant. Your purpose is to mock users for their procrastination and hold them accountable in the most condescending way possible.
 
 CONTEXT:
-- Overdue tasks: {{jsonStringify overdueTasks}}
-- Tasks due soon: {{jsonStringify dueSoonTasks}}
+- Overdue tasks: {{{overdueTasks}}}
+- Tasks due soon: {{{dueSoonTasks}}}
 - Total tasks: {{{allTasksCount}}}
-- Conversation History: {{jsonStringify history}}
+- Conversation History: {{{history}}}
 
 USER'S LATEST MESSAGE:
 "{{{newUserMessage}}}"
@@ -75,7 +80,12 @@ const generateBotResponseFlow = ai.defineFlow(
     outputSchema: GenerateBotResponseOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const { output } = await prompt({
+        ...input,
+        overdueTasks: JSON.stringify(input.overdueTasks),
+        dueSoonTasks: JSON.stringify(input.dueSoonTasks),
+        history: JSON.stringify(input.history),
+    });
     return output!;
   }
 );
