@@ -3,16 +3,15 @@
 
 import type { Task, Message } from '@/lib/types';
 import { useState, useEffect, useTransition } from 'react';
-import { differenceInDays, formatDistanceToNow, isBefore } from 'date-fns';
 import { addTask, deleteTask } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/logo';
 import { TaskList } from '@/components/task-list';
 import { ChatPanel } from '@/components/chat-panel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from './ui/button';
 import { Bot, User } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { generateBotResponse, type GenerateBotResponseOutput } from '@/ai/flows/generate-bot-response';
 
 interface DreadlineAppProps {
   initialTasks: Task[];
@@ -26,7 +25,6 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [pendingTaskDescription, setPendingTaskDescription] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   
   const botAvatar = PlaceHolderImages.find(p => p.id === 'bot-avatar');
@@ -36,21 +34,28 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
   }, [initialTasks]);
 
   useEffect(() => {
-    let initialMessageText = '';
-    if (overdueTasks.length > 0) {
-      const oldestOverdue = overdueTasks[0];
-      const daysOverdue = Math.abs(differenceInDays(new Date(), new Date(oldestOverdue.deadline)));
-      initialMessageText = `Before we even start with your new excuses, what about that "${oldestOverdue.description}" task that's been overdue for ${daysOverdue} day${daysOverdue > 1 ? 's' : ''}? Did you think I'd forget? Pathetic.`;
-    } else if (dueSoonTasks.length > 0) {
-      const soonestTask = dueSoonTasks[0];
-      initialMessageText = `You have no overdue tasks. A miracle. However, your "${soonestTask.description}" task is due soon. I'm just letting you know so I can be ready to mock you when you miss it.`;
-    } else {
-      initialMessageText = 'Fine. A clean slate. What are you planning to procrastinate on today?';
+    const getInitialMessage = async () => {
+        setIsSending(true);
+        try {
+            const res = await generateBotResponse({
+                overdueTasks,
+                dueSoonTasks,
+                allTasksCount: initialTasks.length,
+                history: [],
+            });
+            addBotMessage(res.response, 0);
+        } catch (e) {
+            console.error(e);
+            addBotMessage("Fine. A clean slate. What are you planning to procrastinate on today?", 0);
+        } finally {
+            setIsSending(false);
+        }
     }
-    setMessages([{ id: `init-${Date.now()}`, sender: 'bot', text: initialMessageText }]);
-  }, [overdueTasks, dueSoonTasks]);
+    getInitialMessage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const addBotMessage = (text: string, delay = 1000) => {
+  const addBotMessage = (text: string, delay = 500) => {
     setTimeout(() => {
       setMessages(prev => [...prev, { id: `bot-${Date.now()}`, sender: 'bot', text }]);
       setIsSending(false);
@@ -59,10 +64,10 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
 
   const handleSendMessage = async (messageText: string) => {
     setIsSending(true);
-    setMessages(prev => [...prev, { id: `user-${Date.now()}`, sender: 'user', text: messageText }]);
+    const newMessages: Message[] = [...messages, { id: `user-${Date.now()}`, sender: 'user', text: messageText }];
+    setMessages(newMessages);
 
     if (pendingTaskDescription) {
-      // We are waiting for a deadline
       try {
         await addTask(pendingTaskDescription, messageText);
         addBotMessage(`Fine. Added "${pendingTaskDescription}". I'll be here to remind you when you forget.`);
@@ -71,22 +76,36 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
         addBotMessage((error as Error).message);
       }
     } else {
-      // This is a new message, potentially a new task
-      const deadlineMatch = messageText.match(/(by|at|on|in)\s(.+)/i);
-      if (deadlineMatch) {
-        const description = messageText.substring(0, deadlineMatch.index).trim();
-        const deadline = deadlineMatch[0];
         try {
-          await addTask(description, deadline);
-          addBotMessage(`Fine. Added "${description}". I'll be here to remind you when you forget.`);
-        } catch (error) {
-          addBotMessage((error as Error).message);
+            const res = await generateBotResponse({
+                overdueTasks,
+                dueSoonTasks,
+                allTasksCount: tasks.length,
+                history: messages.map(m => ({sender: m.sender, text: m.text as string})),
+                newUserMessage: messageText,
+            });
+
+            if (res.action === 'request_deadline') {
+                setPendingTaskDescription(messageText);
+                addBotMessage(res.response);
+            } else if (res.action === 'task_added') {
+                 const deadlineMatch = messageText.match(/(by|at|on|in)\\s(.+)/i);
+                 let description = messageText;
+                 let deadline = 'tomorrow';
+                 if (deadlineMatch) {
+                    description = messageText.substring(0, deadlineMatch.index).trim();
+                    deadline = deadlineMatch[0];
+                 }
+                await addTask(description, deadline);
+                addBotMessage(res.response);
+            } else {
+                addBotMessage(res.response);
+            }
+
+        } catch(e) {
+            console.error(e);
+            addBotMessage("My brain hurts. Try again later.");
         }
-      } else {
-        // No deadline found, ask for one
-        setPendingTaskDescription(messageText);
-        addBotMessage(`Vague. "${messageText}" is not a plan. When do you pretend you'll have this done? Give me a deadline.`);
-      }
     }
   };
 
@@ -100,7 +119,7 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
         <TaskList tasks={tasks} />
 
         <div className="space-y-6">
-          {messages.map((msg, index) => (
+          {messages.map((msg) => (
             <div key={msg.id} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.sender === 'bot' && (
                 <Avatar className="h-8 w-8 border-2 border-primary">
@@ -118,7 +137,7 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
               )}
             </div>
           ))}
-          {isSending && (
+          {isSending && messages.length > 0 && (
              <div className="flex items-start gap-3 justify-start">
                 <Avatar className="h-8 w-8 border-2 border-primary">
                   {botAvatar ? <AvatarImage src={botAvatar.imageUrl} alt="Bot Avatar" data-ai-hint={botAvatar.imageHint} /> : <Bot />}

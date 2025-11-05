@@ -1,11 +1,10 @@
+
 'use server';
 
 /**
  * @fileOverview Summarizes the details of a given task.
  *
  * - summarizeTaskDetails - A function that summarizes task details.
- * - SummarizeTaskDetailsInput - The input type for summarizeTaskDetails.
- * - SummarizeTaskDetailsOutput - The output type for summarizeTaskDetails.
  */
 
 import {ai} from '@/ai/genkit';
@@ -15,7 +14,7 @@ const SummarizeTaskDetailsInputSchema = z.object({
   taskDescription: z.string().describe('The description of the task.'),
   deadline: z.string().describe('The deadline of the task in ISO 8601 format.'),
 });
-export type SummarizeTaskDetailsInput = z.infer<typeof SummarizeTaskDetailsInputSchema>;
+type SummarizeTaskDetailsInput = z.infer<typeof SummarizeTaskDetailsInputSchema>;
 
 const SummarizeTaskDetailsOutputSchema = z.object({
   summary: z.string().describe('A concise summary of the task details.'),
