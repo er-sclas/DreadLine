@@ -11,7 +11,9 @@ import { ChatPanel } from '@/components/chat-panel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Bot, User } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { generateBotResponse, type GenerateBotResponseOutput } from '@/ai/flows/generate-bot-response';
+import { generateBotResponse } from '@/ai/flows/generate-bot-response';
+import type { GenerateBotResponseOutput } from '@/ai/flows/generate-bot-response';
+
 
 interface DreadlineAppProps {
   initialTasks: Task[];
@@ -53,7 +55,7 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
     }
     getInitialMessage();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialTasks, overdueTasks, dueSoonTasks]);
 
   const addBotMessage = (text: string, delay = 500) => {
     setTimeout(() => {
