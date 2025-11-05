@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "bot-avatar",
+      "description": "A menacing red circle, representing the Dread-line bot.",
+      "imageUrl": "https://images.unsplash.com/photo-1695477151018-cfec74184891?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxyZWQlMjBjaXJjbGV8ZW58MHx8fHwxNzYyMzM0NDI1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red circle"
+    }
+  ]
 }
