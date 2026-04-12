@@ -29,7 +29,16 @@ const prompt = ai.definePrompt({
   name: 'summarizeTaskDetailsPrompt',
   input: {schema: SummarizeTaskDetailsInputSchema},
   output: {schema: SummarizeTaskDetailsOutputSchema},
-  prompt: `Summarize the following task details in a concise and informative way:\n\nTask Description: {{{taskDescription}}}\nDeadline: {{{deadline}}}`,
+  messages: [
+    {
+      role: 'user',
+      content: [
+        {
+          text: `Summarize the following task details in a concise and informative way:\n\nTask Description: {{{taskDescription}}}\nDeadline: {{{deadline}}}`,
+        },
+      ],
+    },
+  ],
 });
 
 const summarizeTaskDetailsFlow = ai.defineFlow(

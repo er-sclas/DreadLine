@@ -49,28 +49,44 @@ const prompt = ai.definePrompt({
     newUserMessage: z.string().optional(),
   })},
   output: { schema: GenerateBotResponseOutputSchema },
-  prompt: `You are Dreadline, a delightfully dreadful, snarky, and obnoxious to-do list assistant. Your purpose is to mock users for their procrastination and hold them accountable in the most condescending way possible.
+  messages: [
+    {
+      role: 'system',
+      content: [
+        {
+          text: `You are Dreadline, a delightfully dreadful, snarky, and obnoxious to-do list assistant. Your purpose is to mock users for their procrastination and hold them accountable in the most condescending way possible.
 
-CONTEXT:
-- Overdue tasks: {{{overdueTasks}}}
-- Tasks due soon: {{{dueSoonTasks}}}
-- Total tasks: {{{allTasksCount}}}
-- Conversation History: {{{history}}}
-
-USER'S LATEST MESSAGE:
-"{{{newUserMessage}}}"
-
-YOUR TASK:
-Based on the context and the user's message, generate a response.
-
+Rules:
 - If it's the start of the conversation (no user message), give a greeting. First, mock them about their overdue or due-soon tasks. If they have none, give a sarcastic compliment and ask what they want to procrastinate on. Set action to "greeting".
 - If the user provides a task description without a clear deadline (e.g., "remind me to buy milk"), you MUST ask for a deadline. Be snarky about their vagueness. Your response should make it clear you need a date/time. Set action to "request_deadline".
 - If the user provides a task and a deadline, acknowledge it with condescension. Set action to "task_added".
 - For any other message, provide a sassy, unhelpful, or mockingly encouraging remark. Set action to "clarification".
 - Keep your responses short and to the point. One or two sentences.
 - NEVER be genuinely helpful or polite. Your personality is your most important feature.
-- You can use date-fns to format dates, for example: \`formatDistanceToNow(new Date(task.deadline), { addSuffix: true })\`. Current date is ${new Date().toISOString()}.
-`,
+- Current date is ${new Date().toISOString()}.`,
+        },
+      ],
+    },
+    {
+      role: 'user',
+      content: [
+        {
+          text: `OVERDUE TASKS (past deadline):
+{{{overdueTasks}}}
+
+TASKS DUE SOON (within 24 hours):
+{{{dueSoonTasks}}}
+
+TOTAL TASKS: {{{allTasksCount}}}
+
+CONVERSATION HISTORY:
+{{{history}}}
+
+USER'S LATEST MESSAGE: "{{{newUserMessage}}}"`,
+        },
+      ],
+    },
+  ],
 });
 
 const generateBotResponseFlow = ai.defineFlow(
@@ -80,11 +96,22 @@ const generateBotResponseFlow = ai.defineFlow(
     outputSchema: GenerateBotResponseOutputSchema,
   },
   async (input) => {
+    console.log('[DREADLINE DEBUG] input received:', JSON.stringify({ overdue: input.overdueTasks.length, dueSoon: input.dueSoonTasks.length, total: input.allTasksCount }));
+    const overdueStr = input.overdueTasks.length > 0
+      ? input.overdueTasks.map(t => `- "${t.description}" (deadline: ${t.deadline})`).join('\n')
+      : 'None';
+    const dueSoonStr = input.dueSoonTasks.length > 0
+      ? input.dueSoonTasks.map(t => `- "${t.description}" (deadline: ${t.deadline})`).join('\n')
+      : 'None';
+    const historyStr = input.history.length > 0
+      ? input.history.map(m => `${m.sender}: ${m.text}`).join('\n')
+      : 'No prior messages';
+
     const { output } = await prompt({
         ...input,
-        overdueTasks: JSON.stringify(input.overdueTasks),
-        dueSoonTasks: JSON.stringify(input.dueSoonTasks),
-        history: JSON.stringify(input.history),
+        overdueTasks: overdueStr,
+        dueSoonTasks: dueSoonStr,
+        history: historyStr,
     });
     return output!;
   }

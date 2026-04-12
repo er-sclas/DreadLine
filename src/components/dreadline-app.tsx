@@ -35,9 +35,10 @@ export function DreadlineApp({ initialTasks, overdueTasks, dueSoonTasks }: Dread
     const getInitialMessage = async () => {
         setIsSending(true);
         try {
+            console.log('[DREADLINE CLIENT] overdueTasks:', overdueTasks.length, 'dueSoonTasks:', dueSoonTasks.length);
             const res = await generateBotResponse({
-                overdueTasks,
-                dueSoonTasks,
+                overdueTasks: overdueTasks.map(t => ({ description: t.description, deadline: t.deadline })),
+                dueSoonTasks: dueSoonTasks.map(t => ({ description: t.description, deadline: t.deadline })),
                 allTasksCount: initialTasks.length,
                 history: [],
             });
